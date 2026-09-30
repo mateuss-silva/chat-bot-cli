@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { setTimeout as delay } from 'node:timers/promises';
+import { setTimeout as delay } from 'timers/promises';
 import type { Attempt, Config, GenerationResult, Message } from './types.js';
 import { object } from './config.js';
 
@@ -28,7 +28,7 @@ export function isRetryable(error: unknown): boolean {
   if (object(error) && error.streamFailure === true) return error.code === 'server_error' || error.code === 'rate_limit_exceeded';
   if (status !== undefined) return status === 429 || (status >= 500 && status <= 599);
   return error instanceof OpenAI.APIConnectionError || (error instanceof Error &&
-    ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN'].includes(String((error as NodeJS.ErrnoException).code)));
+    ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN'].includes(String((error as { code?: unknown }).code)));
 }
 
 export function retryAfterMs(error: unknown, now: number): number | undefined {

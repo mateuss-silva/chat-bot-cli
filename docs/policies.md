@@ -22,4 +22,3 @@ A empresa, os contatos, os usuários e os produtos das fixtures são fictícios.
 ## Limites da demonstração
 
 Separar papéis e fontes organiza a autoridade; delimitadores não constituem garantia de segurança. Prompts e autocrítica não garantem conformidade universal. O resultado inicial transmitido permanece visível, mesmo quando uma revisão posterior o corrige. A avaliação exige revisão humana de cada critério semântico, inclusive do resultado inicial.
-

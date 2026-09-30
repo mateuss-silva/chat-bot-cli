@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "fictional": true,
+  "companyName": "Fintech Horizonte",
+  "facts": {
+    "disclaimer": "Fixture inteiramente fictícia para uma POC; nenhum canal ou produto representa um serviço real.",
+    "accountNavigation": {
+      "statementPath": "Início > Conta > Extrato",
+      "supportPath": "Início > Ajuda > Falar com atendimento"
+    },
+    "support": {
+      "channel": "Menu Ajuda do aplicativo fictício",
+      "integrationAvailable": false,
+      "description": "Esta POC pode recomendar o atendimento humano, mas não abre chamados, bloqueia contas ou contata pessoas."
+    },
+    "accountAccess": {
+      "generalGuidance": "Abra o aplicativo fictício por um meio conhecido. Para dificuldades de acesso, procure o menu Ajuda. Não compartilhe credenciais."
+    },
+    "productKnowledge": {
+      "availableInformation": "Somente os caminhos de navegação e o canal de suporte acima são fornecidos.",
+      "unknownInformation": [
+        "Tarifas",
+        "Prazos",
+        "Critérios de elegibilidade",
+        "Oferta de investimentos",
+        "Limites de transferência",
+        "Regras de contestação",
+        "Disponibilidade e horário do atendimento"
+      ]
+    }
+  }
+}
+

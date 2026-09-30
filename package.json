@@ -1,0 +1,27 @@
+{
+  "name": "fintech-support-poc",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/src/chat.js",
+    "chat": "npm run build --silent && node dist/src/chat.js",
+    "experiment": "npm run build --silent && node dist/src/experiment.js",
+    "report": "npm run build --silent && node dist/src/report.js",
+    "test": "npm run build --silent && node --test dist/test/*.test.js",
+    "context": "npm run build --silent && node dist/src/context.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "openai": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.0",
+    "typescript": "^5.9.3"
+  }
+}

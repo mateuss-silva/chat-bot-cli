@@ -15,7 +15,11 @@ export function loadConfig(dryRun = false, env: NodeJS.ProcessEnv = process.env)
   return { apiKey, model,
     minIntervalMs: number('MIN_REQUEST_INTERVAL_MS', 1000, 0, 60000),
     timeoutMs: number('REQUEST_TIMEOUT_MS', 60000, 100, 300000),
-    maxOutputTokens: number('MAX_OUTPUT_TOKENS', 1200, 100, 32000) };
+    maxOutputTokens: number('MAX_OUTPUT_TOKENS', 1200, 100, 32000),
+    databasePath: env.DATABASE_PATH?.trim() || 'data/chatbot.sqlite',
+    historyLimit: number('HISTORY_MAX_TURNS', 20, 1, 100),
+    memoryLimit: number('MEMORY_MAX_TURNS', 3, 0, 20),
+    memoryMaxChars: number('MEMORY_MAX_CHARS', 2000, 0, 20000) };
 }
 
 export async function readJson(path: string): Promise<unknown> {

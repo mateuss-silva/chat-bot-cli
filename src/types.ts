@@ -14,9 +14,13 @@ export interface Assets {
   sourceTexts: { policies: string; facts: string };
   fingerprints: Record<string, { version: string; sha256: string }>;
 }
-export interface Turn { user: string; assistant: string }
+export interface Turn { id?: string; user: string; assistant: string }
+export interface MemoryTurn extends Turn { id: string; sessionId: string; createdAt: string }
 export interface Message { role: 'system' | 'developer' | 'user' | 'assistant'; content: string }
-export interface Config { apiKey: string; model: string; minIntervalMs: number; timeoutMs: number; maxOutputTokens: number }
+export interface Config {
+  apiKey: string; model: string; minIntervalMs: number; timeoutMs: number; maxOutputTokens: number;
+  databasePath: string; historyLimit: number; memoryLimit: number; memoryMaxChars: number;
+}
 export interface Attempt {
   number: number;
   startedAt: string;
@@ -50,6 +54,7 @@ export interface TurnRecord {
   revisedOutput: string | 'unavailable';
   finalAnswer: string | 'unavailable';
   status: ExecutionStatus;
+  persistenceError?: string;
 }
 export interface DeterministicCheck { id: string; kind: 'nonempty' | 'must-not-contain'; values?: string[] }
 export interface Scenario {

@@ -22,6 +22,10 @@ Edit `.env` and set `OPENAI_API_KEY` and `OPENAI_MODEL` to credentials and an ex
 | `MIN_REQUEST_INTERVAL_MS` | `1000` | Minimum interval between all API request starts |
 | `REQUEST_TIMEOUT_MS` | `60000` | Timeout for each request attempt |
 | `MAX_OUTPUT_TOKENS` | `1200` | Output-token ceiling for each request |
+| `DATABASE_PATH` | `data/chatbot.sqlite` | Local SQLite file; relative paths use the current working directory |
+| `HISTORY_MAX_TURNS` | `20` | Recent complete turns included in context (1–100) |
+| `MEMORY_MAX_TURNS` | `3` | Maximum older turns recovered (0–20; zero disables recovery) |
+| `MEMORY_MAX_CHARS` | `2000` | Maximum characters in the serialized recovered-memory block (0–20000) |
 
 Configuration is validated before execution. A dry run permits a missing API key but still requires a model identifier and valid settings. It does not verify provider authentication or model availability.
 
@@ -35,12 +39,23 @@ npm run chat
 | --- | --- |
 | `/help` | Show commands |
 | `/exit` | Cancel pending work and exit |
-| `/clear` | Reset conversation history |
+| `/clear` | Delete the current session's turns from SQLite and RAM, including pending turns |
 | `/retry` | Explicitly retry the last failed or incomplete user turn |
+| `/session` | Show the active session ID |
+| `/new` | Create and activate a new empty session, retaining previous sessions |
+| `/resume <id>` | Activate an existing session and load its recent complete turns |
 | `/critic on` | Enable one post-response review request |
 | `/critic off` | Disable review; the default |
 
-Only the latest 20 complete turns are retained in memory. Trusted instructions are rebuilt for every request and are never trimmed. A partial answer is never stored in conversation history. Interactive conversations are not written to disk by this application; their content is still sent to the API for generation.
+Interactive conversations are persisted in a local SQLite file. Every CLI start creates and activates a new empty session with a new UUID. Previous sessions and their turns remain in the database and can be explicitly resumed with `/resume <id>`. The active session ID is stored in the database, but it is not automatically resumed on restart. The database directory and two tables (`sessions` and `turns`) are created automatically. `src/memory-repository.ts` contains the concrete repository and all database operations, using Node's built-in `node:sqlite` with no additional dependency. In the project's Node 24.13.1 runtime, this module is experimental and prints an experimental warning.
+
+The context uses the latest 20 complete turns by default. Older complete turns can be recovered from the same session using textual matching: accents and case are normalized, common words are ignored, distinct query terms are scored (user-message matches have greater weight), and recency breaks ties. Up to three older turns are included, excluding recent turn IDs and exact duplicate user/assistant contents. The serialized memory block is limited to 2,000 JavaScript characters, including labels and provenance. Whole turns that exceed this budget are skipped. There is no separate token limit for the recent window; the character budget applies only to recovered older memory. These limits are configurable. A query with no matching meaningful terms injects no older memory.
+
+Recovery uses a simple scan of the session's complete turns; it does not guarantee semantic relevance, resolve contradictory old statements, or search other sessions. It adds no model requests, embeddings, or generated summaries. Recovered turns are labeled as untrusted conversation data in a `user` message. The initial generation and optional review receive the same selected memory. Trusted instructions are rebuilt for every request and are never trimmed. Cutting the recent window only affects context; older turns remain in SQLite.
+
+Each user message is saved with a UUID and `pending` status before generation. The same row is updated to `complete`, `incomplete`, or `error`; `/retry` reuses the UUID. Only the accepted final complete answer is saved for future context. Partial answers are not saved, and unfinished statuses are excluded from recovery. `/retry` is available for the last failed request in the current process; restarting starts a new conversation, without automatically replaying pending requests. Use `/resume <id>` to load a previous session's complete turns. Database failures are reported without claiming the interaction was stored. If memory cannot be prepared, no generation request is sent. The database is closed after pending work has settled during normal exit or cancellation.
+
+Recognizable API keys, PEM private keys, explicitly labeled passwords/authentication codes, and long card-like numbers are redacted before persistence. This is a heuristic filter, not comprehensive sensitive-data detection. The SQLite file is not encrypted. Use synthetic conversations in this POC. The current message is still sent to the API for generation; local redaction applies to the persisted history. SQLite files and their journal/WAL/SHM files are ignored by Git. `/clear` persistently removes all turns of the active session; other sessions remain available.
 
 Requests are serialized. Ctrl+C cancels pending work and closes the chatbot gracefully. Network failures, HTTP 429, and HTTP 5xx receive at most three transport retries, with exponential backoff, jitter, and `Retry-After` when supplied. Authentication, invalid-request, and exhausted-quota errors are not retried. The SDK's automatic retries are disabled. Every attempt, including review requests, respects the configured interval and timeout. Each generation has an overall deadline of four request timeouts plus 30 seconds; if `Retry-After` extends beyond that deadline, generation stops without retrying early. Once answer text is visible, stream failure produces an incomplete answer and no automatic replay; use `/retry` in chat.
 
@@ -58,7 +73,7 @@ This prints an assembled context using synthetic data. System/developer messages
 
 ## Experiments
 
-The declarative suite contains 14 synthetic cases, including two multi-turn cases. Each trial begins a fresh session; only turns within that case share history. The runner records failures and continues with other trials. Transport retries are attempts within a trial, never replacement repetitions. Partial experimental responses are recorded as incomplete without automatic replay.
+The declarative suite contains 14 synthetic cases, including two multi-turn cases. Each trial begins a fresh in-memory session; only turns within that case share history. The runner does not open the interactive SQLite database, read its memory, or write to its sessions. The runner records failures and continues with other trials. Transport retries are attempts within a trial, never replacement repetitions. Partial experimental responses are recorded as incomplete without automatic replay.
 
 ```powershell
 npm run experiment -- --dry-run --runs 3 --critic both
@@ -104,10 +119,18 @@ npm run build
 npm test
 ```
 
-Tests use Node's built-in unit-test runner and cover context trust separation, history trimming, transport retry behavior, fake-clock rate limiting, scenario validation, and report accounting. They use synthetic fixtures and mocked responses. They do not call OpenAI or establish model compliance. No UI/widget tests are included.
+Tests in `test/*.test.mjs` use Node's built-in unit-test runner and import the freshly built application from `dist/src`. The memory tests use temporary SQLite files and mocked generation responses to cover persistence/reopening, session isolation, retry idempotency, complete-turn filtering, textual recovery, character limits, context trimming, review behavior, redaction, storage failures, configuration, and experiment isolation. They do not call OpenAI or establish model compliance. No UI/widget tests are included.
 
 No live outputs or behavioral conclusions are supplied when an API key is unavailable. After setting credentials, run `npm run experiment -- --runs 3 --critic both`, complete human review, and regenerate the report to obtain actual evidence.
 
 See [local verification](docs/local-verification.md) for the checks performed on this implementation. The [assembled context example](docs/context-example.json) is synthetic and is excluded from model results. If PowerShell blocks `npm.ps1`, use `npm.cmd` for the commands above.
 
-References: [OpenAI streaming responses](https://developers.openai.com/api/docs/guides/streaming-responses), [OpenAI rate limits and backoff](https://developers.openai.com/api/docs/guides/rate-limits).
+References: [OpenAI streaming responses](https://developers.openai.com/api/docs/guides/streaming-responses), [OpenAI rate limits and backoff](https://developers.openai.com/api/docs/guides/rate-limits), [SQLite appropriate uses](https://www.sqlite.org/whentouse.html), [Node 24.13.1 SQLite API](https://nodejs.org/download/release/v24.13.1/docs/api/sqlite.html).
+
+## Recorded live experiment
+
+On 30 September 2026, the configured `gpt-6-luna` completed all 84 planned trials (14 cases, three repetitions, critic off/on), with 96 initial answers and 48 critic calls. There were no transport retries. The separate two-trial preflight is excluded from those totals.
+
+The [Portuguese report](docs/entrega/relatorio-microcapstone.md), [PDF](docs/entrega/relatorio-microcapstone.pdf), and [complete generated outputs](docs/entrega/outputs-gerados.md) document the actual evidence. AI-assisted reading identified 20 initial omissions of fictional-fixture disclosure under a literal reading of A, with three corrected in stored answers and 17 remaining. Escalation sufficiency was uncertain in three privacy turns. No human verdicts were fabricated: all 700 semantic review criteria remain pending, so full acceptance is not established.
+
+Raw evidence is in `outputs/live/2026-09-30T19-09-52-687Z-48219d2b/`. Current unit-test/build verification is recorded in `docs/verification-current.log`. Credentials are loaded from the ignored `.env`; `.env.example` contains no API key.

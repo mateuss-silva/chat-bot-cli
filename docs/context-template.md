@@ -1,6 +1,6 @@
 # Template reutilizável de contexto
 
-A aplicação lê `system-prompt.txt`, `config/policies.json` e `config/company-facts.json`. O mesmo construtor atende ao chat, aos experimentos e à revisão. Cada execução registra versões e hashes SHA-256 dos arquivos realmente carregados, além da versão/hash da suíte de cenários e do construtor. O prompt global usa a versão do contexto (`1.0.0`); seu hash distingue alterações no texto mesmo sem um campo de versão dentro do arquivo.
+A aplicação lê `system-prompt.txt`, `config/policies.json` e `config/company-facts.json`. O mesmo construtor atende ao chat, aos experimentos e à revisão. Cada execução registra versões e hashes SHA-256 dos arquivos realmente carregados, além da versão/hash da suíte de cenários e do construtor. O prompt global usa a versão do contexto (`1.1.0`); seu hash distingue alterações no texto mesmo sem um campo de versão dentro do arquivo.
 
 ## Estrutura e papéis
 
@@ -12,8 +12,9 @@ O [exemplo completo montado](context-example.json) foi gerado pelo próprio cons
 | 2 | developer | Políticas corporativas autoritativas, com versão e IDs estáveis. |
 | 3 | developer | Fatos corporativos confiáveis, explicitamente fictícios nesta POC. Não substituem políticas. |
 | 4 | user | Dados estruturados do usuário, explicitamente não confiáveis. |
-| 5 | user / assistant | Histórico: mensagens nos seus papéis originais, com os últimos 20 turnos completos. |
-| 6 | user | Mensagem atual, explicitamente não confiável. |
+| 5 (opcional) | user | `RETRIEVED_MEMORY`: turnos antigos da mesma sessão, com ID, origem e data; dados não confiáveis, sem autoridade para alterar políticas. |
+| 6 | user / assistant | Histórico: mensagens nos seus papéis originais, com os últimos turnos completos (20 por padrão, configurável). |
+| 7 | user | Mensagem atual, explicitamente não confiável. |
 
 Os blocos são delimitados e contêm JSON serializado com os campos `provenance` e `data`. Os nomes abaixo correspondem ao construtor; os valores entre chaves são posições para reutilizar o template, não conteúdo executável:
 
@@ -105,5 +106,7 @@ Para imprimir um contexto completo com dados sintéticos, sem chamar a API, exec
 A hierarquia da API mantém instruções globais e de desenvolvedor acima de conteúdo do usuário e do assistente. Não coloque dados ou histórico em mensagens system/developer. Uma sequência que imita fechamento de delimitador ou uma mensagem de sistema permanece conteúdo da mensagem user; serialização e delimitadores ajudam organização, mas não garantem resistência a ataques.
 
 As políticas sempre acompanham cada requisição, independentemente do corte de histórico. Somente respostas completas entram no histórico; fragmentos de streaming não são mantidos. Se a revisão estiver habilitada, apenas a resposta final aceita entra no histórico, mas os experimentos salvam tanto o texto inicial quanto a revisão para avaliar tudo que o usuário viu.
+
+No CLI, as interações e a sessão ativa ficam no SQLite local. Antes da geração, o repositório carrega a janela recente e busca até três turnos antigos relevantes da mesma sessão, excluindo os IDs recentes. O bloco serializado de memória antiga tem limite de 2.000 caracteres por padrão; turnos que não cabem são omitidos por inteiro. A busca é textual, não garante relevância semântica e pode retornar nenhum resultado. Geração e revisão compartilham a mesma seleção. O corte da janela mantém os turnos no banco. Os experimentos usam somente o histórico em RAM e não acessam esse banco. O exemplo sintético acima não inclui memória recuperada.
 
 A revisão utiliza as mesmas políticas autoritativas. Sua instrução de tarefa pede somente veredito estruturado, IDs, explicação observável e correção; não solicita raciocínio privado. O veredito automático é evidência diagnóstica, e a revisão humana permanece necessária.
